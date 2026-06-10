@@ -2,7 +2,7 @@ import type { ShellKeyAction } from '@nuxy/core'
 import type { Note } from './types.ts'
 import { deriveTitle } from './utils/noteTitle.ts'
 import { invoke } from './utils/ipc.ts'
-import { createStore, type Store } from '../ce-utils.ts'
+import { createStore, type Store } from '../store.ts'
 import { createTranslator, type Translator } from '../shell-i18n.ts'
 
 const EXT_ID = 'com.nuxy.notes'
@@ -124,10 +124,15 @@ export class NotesController {
 
   setEditMode(editMode: boolean): void {
     this.store.setState({ editMode })
-    if (editMode && this.textareaRef.current) {
-      this.textareaRef.current.focus()
-      const len = this.textareaRef.current.value.length
-      this.textareaRef.current.setSelectionRange(len, len)
+    if (editMode) {
+      requestAnimationFrame(() => {
+        const ta = this.textareaRef.current
+        if (ta) {
+          ta.focus()
+          const len = ta.value.length
+          ta.setSelectionRange(len, len)
+        }
+      })
     }
     window.core?.shell?.refreshKeyHints()
   }
@@ -141,9 +146,8 @@ export class NotesController {
       selected: note,
       body: '',
       selectedIndex: 1,
-      editMode: true,
     })
-    window.core?.shell?.refreshKeyHints()
+    this.setEditMode(true)
   }
 
   async handleSave(): Promise<void> {
@@ -285,8 +289,8 @@ export class NotesController {
           } else {
             const note = filteredNotes[selectedIndex - 1]
             if (note) {
-              this.store.setState({ selected: note, body: note.body, editMode: true })
-              window.core?.shell?.refreshKeyHints()
+              this.store.setState({ selected: note, body: note.body })
+              this.setEditMode(true)
             }
           }
         },
@@ -295,13 +299,9 @@ export class NotesController {
         key: 'Escape',
         label: t('actions.focusSearchExitEdit'),
         hint: 'Esc',
+        activeOn: () => editMode,
         handler: () => {
-          if (editMode) {
-            this.setEditMode(false)
-          } else {
-            window.core?.shell?.controlOmniBar('show')
-            this.setSelectedIndex(-1)
-          }
+          this.setEditMode(false)
         },
       },
       {
@@ -350,7 +350,11 @@ export class NotesController {
       if (selected !== null) {
         actions.push(
           { id: 'notes-save', label: t('actions.save'), onExecute: () => void this.handleSave() },
-          { id: 'notes-delete', label: t('actions.delete'), onExecute: () => void this.handleDelete() },
+          {
+            id: 'notes-delete',
+            label: t('actions.delete'),
+            onExecute: () => void this.handleDelete(),
+          },
           {
             id: 'notes-record',
             label: recording ? t('actions.stopRecording') : t('actions.record'),

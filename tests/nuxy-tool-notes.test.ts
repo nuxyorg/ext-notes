@@ -32,6 +32,7 @@ vi.hoisted(() => {
     },
   }
   ;(globalThis as any).document = {
+    createTreeWalker: vi.fn(() => ({ nextNode: vi.fn() })),
     createTextNode(text: string) {
       return { nodeType: 3, textContent: text }
     },
@@ -63,8 +64,34 @@ vi.hoisted(() => {
   }
 })
 
+// Mock @nuxy/core package
+vi.mock('@nuxy/core', async () => {
+  const actual = await vi.importActual<typeof import('@nuxy/core')>('@nuxy/core')
+  return {
+    ...actual,
+    LitElement: class LitElementStub extends globalThis.HTMLElement {
+      requestUpdate = vi.fn()
+      updateComplete = Promise.resolve(true)
+      connectedCallback() {}
+      disconnectedCallback() {}
+    },
+    html: (strings: any, ...values: any[]) => strings,
+    css: (strings: any, ...values: any[]) => strings,
+    nothing: null,
+    customElement: (tag: string) => (ctor: any) => {
+      customElements.define(tag, ctor)
+      return ctor
+    },
+    property: () => () => {},
+    state: () => () => {},
+    query: () => () => {},
+    ref: (cb: any) => cb,
+    createRef: () => ({ current: null }),
+  }
+})
+
 import { resolveToolElementTag } from '@nuxy/core'
-import notesManifest from './manifest.json'
+import notesManifest from '../manifest.json'
 
 describe('notes tool element manifest', () => {
   it('declares nuxy-tool-notes tag', () => {
@@ -76,7 +103,7 @@ describe('nuxy-tool-notes element', () => {
   beforeEach(async () => {
     vi.resetModules()
     customElements.registry.clear()
-    await import('./nuxy-tool-notes.ts')
+    await import('../frontend.ts')
   })
 
   afterEach(() => {
@@ -103,7 +130,7 @@ describe('nuxy-tool-notes element', () => {
     expect(el.query).toBe('todo')
     expect(el.committedQuery).toBe('todo list')
     expect(el.extensionId).toBe('com.nuxy.notes')
-    expect(el.replaceChildren).toHaveBeenCalled()
+    expect(window.core.shell.registerKeyActions).toHaveBeenCalled()
   })
 
   it('cleans up on disconnect', () => {
@@ -111,7 +138,6 @@ describe('nuxy-tool-notes element', () => {
     const el = new Ctor() as HTMLElement
     el.connectedCallback()
     el.disconnectedCallback()
-    expect(el.replaceChildren).toHaveBeenCalled()
     expect(window.core.shell.registerActions).toHaveBeenCalledWith([])
   })
 })

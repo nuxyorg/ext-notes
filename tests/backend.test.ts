@@ -56,7 +56,7 @@ afterEach(() => {
 })
 
 async function freshBackend(): Promise<(core: CoreContext) => Promise<void>> {
-  const mod = await import('./backend.ts')
+  const mod = await import('../backend.ts')
   return mod.register
 }
 

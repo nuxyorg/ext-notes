@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveTitle } from './noteTitle.ts'
+import { deriveTitle } from '../utils/noteTitle.ts'
 
 describe('deriveTitle', () => {
   it('returns "New Note" for empty string', () => {
