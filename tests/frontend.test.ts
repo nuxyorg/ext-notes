@@ -10,12 +10,27 @@ vi.hoisted(() => {
   }
   ;(globalThis as any).window = {
     core: {
-      ipc: { invoke: vi.fn().mockResolvedValue({ success: true, data: [] }) },
+      ipc: {
+        invoke: vi.fn(async (_ext: string, channel: string) => {
+          if (channel === 'getExtensionTranslations') {
+            return {
+              success: true,
+              data: {
+                locale: 'en',
+                dir: 'ltr',
+                translations: { 'search.placeholder': 'Search in notes' },
+              },
+            }
+          }
+          return { success: true, data: [] }
+        }),
+      },
       shell: {
         registerKeyActions: vi.fn(),
         registerActions: vi.fn(),
         refreshKeyHints: vi.fn(),
         controlOmniBar: vi.fn(),
+        setSearchPlaceholder: vi.fn(),
       },
       events: { on: vi.fn(() => () => {}) },
     },
@@ -75,8 +90,8 @@ vi.mock('@nuxy/core', async () => {
       connectedCallback() {}
       disconnectedCallback() {}
     },
-    html: (strings: any, ...values: any[]) => strings,
-    css: (strings: any, ...values: any[]) => strings,
+    html: (strings: any, ..._values: any[]) => strings,
+    css: (strings: any, ..._values: any[]) => strings,
     nothing: null,
     customElement: (tag: string) => (ctor: any) => {
       customElements.define(tag, ctor)
@@ -114,7 +129,7 @@ describe('nuxy-tool-notes element', () => {
     expect(customElements.get('nuxy-tool-notes')).toBeDefined()
   })
 
-  it('forwards query property to controller on updates', () => {
+  it('forwards query property to controller on updates', async () => {
     const Ctor = customElements.get('nuxy-tool-notes')!
     const el = new Ctor() as HTMLElement & {
       query: string
@@ -126,11 +141,13 @@ describe('nuxy-tool-notes element', () => {
     el.extensionId = 'com.nuxy.notes'
     el.query = 'todo'
     el.committedQuery = 'todo list'
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(el.query).toBe('todo')
     expect(el.committedQuery).toBe('todo list')
     expect(el.extensionId).toBe('com.nuxy.notes')
     expect(window.core.shell.registerKeyActions).toHaveBeenCalled()
+    expect(window.core.shell.setSearchPlaceholder).toHaveBeenCalled()
   })
 
   it('cleans up on disconnect', () => {
